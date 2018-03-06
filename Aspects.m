@@ -9,6 +9,7 @@
 #import <libkern/OSAtomic.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import <pthread/pthread.h>
 
 /* log宏定义*/
 #define AspectLog(...)
@@ -143,11 +144,11 @@ if (error) { *error = [NSError errorWithDomain:AspectErrorDomain code:errorCode 
 NSString *const AspectErrorDomain = @"AspectErrorDomain";
 static NSString *const AspectsSubclassSuffix = @"_Aspects_";
 static NSString *const AspectsMessagePrefix = @"aspects_";
-
 @implementation NSObject (Aspects)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark - Public Aspects API
+
 
 + (id<AspectToken>)aspect_hookSelector:(SEL)selector
                       withOptions:(AspectOptions)options
@@ -174,9 +175,10 @@ static id aspect_add(id self, SEL selector, AspectOptions options, id block, NSE
     NSCParameterAssert(self);
     NSCParameterAssert(selector);
     NSCParameterAssert(block);
+    
 
     __block AspectIdentifier *identifier = nil;
-    // 自旋锁，保证线程安全执行
+    // 互斥锁，保证线程安全执行
     aspect_performLocked(^{
         if (aspect_isSelectorAllowedAndTrack(self, selector, options, error)) {
             // 拿到aspect容器
@@ -224,13 +226,17 @@ static BOOL aspect_remove(AspectIdentifier *aspect, NSError **error) {
 }
 
 /**
- 自旋锁，保证操作线程安全
+ 互斥锁，保证操作线程安全
  */
 static void aspect_performLocked(dispatch_block_t block) {
-    static OSSpinLock aspect_lock = OS_SPINLOCK_INIT;
-    OSSpinLockLock(&aspect_lock);
+    static pthread_mutex_t aspectLock;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        pthread_mutex_init(&aspectLock,NULL);
+    });
+    pthread_mutex_lock(&aspectLock);
     block();
-    OSSpinLockUnlock(&aspect_lock);
+    pthread_mutex_unlock(&aspectLock);
 }
 
 /**

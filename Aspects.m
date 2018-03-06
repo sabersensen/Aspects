@@ -227,10 +227,11 @@ static BOOL aspect_remove(AspectIdentifier *aspect, NSError **error) {
  自旋锁，保证操作线程安全
  */
 static void aspect_performLocked(dispatch_block_t block) {
-    static OSSpinLock aspect_lock = OS_SPINLOCK_INIT;
-    OSSpinLockLock(&aspect_lock);
+    // OSSpinLock不安全 http://www.open-open.com/news/view/1ca59d6
+    dispatch_semaphore_t aspect_lock = dispatch_semaphore_create(1);
+    dispatch_semaphore_wait(aspect_lock, DISPATCH_TIME_FOREVER);
     block();
-    OSSpinLockUnlock(&aspect_lock);
+    dispatch_semaphore_signal(aspect_lock);
 }
 
 /**

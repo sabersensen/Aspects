@@ -13,3 +13,9 @@
 - (IBAction)buttonPressed:(id)sender;
 
 @end
+
+@interface Persion:NSObject
+
++ (void)call;
+
+@end

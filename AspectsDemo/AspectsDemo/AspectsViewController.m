@@ -29,6 +29,23 @@
     [testController aspect_hookSelector:NSSelectorFromString(@"dealloc") withOptions:AspectPositionBefore usingBlock:^(id<AspectInfo> info) {
         NSLog(@"Controller is about to be deallocated: %@", [info instance]);
     } error:NULL];
+    
+    [Persion aspect_hookSelector:@selector(call) withOptions:AspectPositionBefore usingBlock:^(id<AspectInfo> info){
+        NSLog(@"------2call-----");
+    } error:nil];
+}
+
+- (void)viewWillLayoutSubviews{
+    [super viewWillLayoutSubviews];
+    NSLog(@"1111111111");
 }
 
 @end
+@implementation Persion
+
++(void)call{
+    NSLog(@"----call----");
+}
+
+@end
+

@@ -181,7 +181,7 @@ static id aspect_add(id self, SEL selector, AspectOptions options, id block, NSE
     // 互斥锁，保证线程安全执行
     aspect_performLocked(^{
         if (aspect_isSelectorAllowedAndTrack(self, selector, options, error)) {
-            // 拿到aspect容器
+            // 拿到aspect容器 给self添加一个属性 属性名为aspects_selector名 属性内容为AspectsContainer实例
             AspectsContainer *aspectContainer = aspect_getContainerForObject(self, selector);
             // 生成aspect唯一标识对象
             identifier = [AspectIdentifier identifierWithSelector:selector object:self options:options block:block error:error];
@@ -502,13 +502,18 @@ static Class aspect_hookClass(NSObject *self, NSError **error) {
 	object_setClass(self, subclass);
 	return subclass;
 }
-// 新建一个类的子类，isa指向要hook类的所属类，把self的isa指向子类，成功把self变成其子类xxx_Aspects_，调用[self a].就相当于调用[子类 a]，消息转发替换a的实现让他执行forwardInvocation:，这样我们就hook了方法
-// 类的forwardInvocation方法替换为__ASPECTS_ARE_BEING_CALLED__的实现，返回新函数imp
+
 static NSString *const AspectsForwardInvocationSelectorName = @"__aspects_forwardInvocation:";
+
+/**
+ 新建一个类的子类，isa指向要hook类的所属类，把self的isa指向子类，成功把self变成其子类xxx_Aspects_，调用[self a].就相当于调用[子类 a]，消息转发替换a的实现让他执行forwardInvocation:，这样我们就hook了方法
+ 类的forwardInvocation方法替换为__ASPECTS_ARE_BEING_CALLED__的实现，返回新函数imp
+ */
 static void aspect_swizzleForwardInvocation(Class klass) {
     NSCParameterAssert(klass);
     
     // 替换类中已有方法的实现，返回原来函数imp
+
     IMP originalImplementation = class_replaceMethod(klass, @selector(forwardInvocation:), (IMP)__ASPECTS_ARE_BEING_CALLED__, "v@:@");
     if (originalImplementation) {
         // originalImplementation不为空的话说明原方法有实现，添加一个新方法保存原来类的ForwardInvocation方法实现
@@ -739,7 +744,9 @@ static BOOL aspect_isSelectorAllowedAndTrack(NSObject *self, SEL selector, Aspec
         AspectError(AspectErrorSelectorDeallocPosition, errorDesc);
         return NO;
     }
-    // 检查要hook的方法是否在类或类的实例中存在（不存在自然返回）
+    // 检查要hook的方法是否在类或类的实例中存在（不存在自然返回
+    // instancesRespondToSelector 判断该类的实例是否包含该方法 等效于 [实例 respondsToSelector]
+    // respondsToSelector 判断该类是否有该方法 或者该实例是否有该方法
     if (![self respondsToSelector:selector] && ![self.class instancesRespondToSelector:selector]) {
         NSString *errorDesc = [NSString stringWithFormat:@"Unable to find selector -[%@ %@].", NSStringFromClass(self.class), selectorName];
         AspectError(AspectErrorDoesNotRespondToSelector, errorDesc);
